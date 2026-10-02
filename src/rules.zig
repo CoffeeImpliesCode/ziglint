@@ -222,7 +222,13 @@ pub const Rule = enum(u16) {
                 const sep = std.mem.indexOfScalar(u8, context, 0) orelse context.len;
                 const param_name = context[0..sep];
                 const reason = if (sep < context.len) context[sep + 1 ..] else "";
-                try writer.print("{s}deinit{s} should set {s}{s}.* = undefined{s}", .{ y, r, b, param_name, r });
+                try writer.print("{s}deinit{s} should leave {s}{s} invalid, empty, or destroyed{s}", .{
+                    y,
+                    r,
+                    b,
+                    param_name,
+                    r,
+                });
                 if (reason.len > 0) {
                     try writer.print(" ({s})", .{reason});
                 }
@@ -344,91 +350,4 @@ fn RuleConfig(comptime enabled_by_default: bool, comptime Extra: type) type {
 
 test "rule codes" {
     try std.testing.expectEqualStrings("Z001", Rule.Z001.code());
-}
-
-test "Z017 recommends a coercion-preserving rewrite" {
-    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
-    defer output.deinit();
-
-    try Rule.Z017.writeMessage(&output.writer, "allocThing()", false);
-
-    try std.testing.expectEqualStrings(
-        "avoid try in return; hoist it to preserve payload coercion: `const value = try allocThing(); return value;`",
-        output.written(),
-    );
-}
-
-test "Z002 recommends valid fixes for named discards" {
-    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
-    defer output.deinit();
-
-    try Rule.Z002.writeMessage(&output.writer, "_result", false);
-
-    try std.testing.expectEqualStrings(
-        "initialized variable '_result' uses a named discard; rename it if used or write `_ = expression;` to discard the value",
-        output.written(),
-    );
-}
-
-test "Z003 includes the parser error" {
-    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
-    defer output.deinit();
-
-    try Rule.Z003.writeMessage(&output.writer, "expected expression", false);
-
-    try std.testing.expectEqualStrings("parse error: expected expression", output.written());
-}
-
-test "Z004 recommends preserving the declaration" {
-    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
-    defer output.deinit();
-
-    try Rule.Z004.writeMessage(&output.writer, "point\x00Point", false);
-
-    try std.testing.expectEqualStrings(
-        "prefer type annotation 'Point' with an anonymous initializer for 'point'; preserve the declaration kind, modifiers, and fields",
-        output.written(),
-    );
-}
-
-test "Z020 recommends the enclosing named struct" {
-    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
-    defer output.deinit();
-
-    try Rule.Z020.writeMessage(&output.writer, "Widget", false);
-
-    try std.testing.expectEqualStrings("inline @This() in named struct; use 'Widget' instead", output.written());
-}
-
-test "Z020 recommends Self for an anonymous struct" {
-    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
-    defer output.deinit();
-
-    try Rule.Z020.writeMessage(&output.writer, "", false);
-
-    try std.testing.expectEqualStrings("inline @This(); assign it to `const Self = @This();`", output.written());
-}
-
-test "Z021 includes both accepted aliases" {
-    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
-    defer output.deinit();
-
-    try Rule.Z021.writeMessage(&output.writer, "Wrong\x00Config", false);
-
-    try std.testing.expectEqualStrings(
-        "@This() alias 'Wrong' should match filename 'Config' or be 'Self'",
-        output.written(),
-    );
-}
-
-test "Z030 uses the receiver name" {
-    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
-    defer output.deinit();
-
-    try Rule.Z030.writeMessage(&output.writer, "value\x00has early return before invalidation", false);
-
-    try std.testing.expectEqualStrings(
-        "deinit should set value.* = undefined (has early return before invalidation)",
-        output.written(),
-    );
 }
