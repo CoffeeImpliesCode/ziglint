@@ -49,6 +49,24 @@ pub fn build(b: *std.Build) void {
 
     const lint_step = addLint(b, exe, &.{ b.path("src"), b.path("build.zig") });
     test_step.dependOn(lint_step);
+
+    const docs_step = b.step("docs", "Generate API documentation into zig-out/docs");
+    const docs_mod = b.createModule(.{
+        .root_source_file = b.path("src/main.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    docs_mod.addOptions("build_options", options);
+    const docs_obj = b.addObject(.{
+        .name = "ziglint",
+        .root_module = docs_mod,
+    });
+    const docs_install = b.addInstallDirectory(.{
+        .source_dir = docs_obj.getEmittedDocs(),
+        .install_dir = .prefix,
+        .install_subdir = "docs",
+    });
+    docs_step.dependOn(&docs_install.step);
 }
 
 /// Add a ziglint step to your build. Use as a dependency to run linting.
